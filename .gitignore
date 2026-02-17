@@ -1,0 +1,25 @@
+# Hugo build output
+public/
+resources/_gen/
+
+# Hugo local server
+.hugo_build.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*~
+*.swp
+*.swo
+\#*\#
+.#*
+
+# Private planning files
+PLAN.org
+ISSUES.org
+
+# Environment
+.env
+.env.*
