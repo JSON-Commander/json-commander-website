@@ -1,4 +1,4 @@
-baseURL = "https://json-commander.github.io/json-commander-website/"
+baseURL = "https://json-commander.github.io/"
 title = "JSON Commander"
 languageCode = "en-us"
 description = "A C++20 library for defining CLIs declaratively using JSON schemas. Type-safe argument parsing, nested subcommands, and automatic help generation."
