@@ -1,6 +1,7 @@
 # Hugo build output
 public/
-resources/_gen/
+resources/
+_vendor/
 
 # Hugo local server
 .hugo_build.lock
