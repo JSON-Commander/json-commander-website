@@ -10,9 +10,11 @@ CLI application.
 
 JSON Commander requires:
 
-- A **C++20** compatible compiler (GCC 12+, Clang 15+, MSVC 2022+)
-- **CMake** 3.20 or later
-- A JSON library (nlohmann/json is used by default)
+- A **C++20** compatible compiler (GCC 12+, Clang 16+, or Apple Clang via Xcode 15+)
+- **CMake** 3.12 or later (3.21+ if using presets)
+
+Dependencies (nlohmann/json, json-schema-validator, Catch2) are fetched
+automatically via CMake FetchContent — no manual installation needed.
 
 ## Installation
 
@@ -24,69 +26,136 @@ The simplest way to add JSON Commander to your project:
 include(FetchContent)
 FetchContent_Declare(
   json_commander
-  GIT_REPOSITORY https://github.com/json-commander/json-commander.git
-  GIT_TAG main
+  GIT_REPOSITORY https://github.com/JSON-Commander/json-commander.git
+  GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(json_commander)
 
-target_link_libraries(your_target PRIVATE json_commander::json_commander)
+target_link_libraries(your_target PRIVATE
+  json_commander::header
+  json_commander::library
+  nlohmann_json::nlohmann_json
+  nlohmann_json_schema_validator)
 ```
 
 ### Building from Source
 
 ```sh
-git clone https://github.com/json-commander/json-commander.git
+git clone --recurse-submodules https://github.com/JSON-Commander/json-commander.git
 cd json-commander
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-cmake --install build
+cmake --preset <preset-name>
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
+
+Presets are defined per-compiler in `CMakeUserPresets.json` (auto-generated
+from `compilers.json`). See the repository README for details.
 
 ## Your First CLI
 
-Create a schema file `hello.json`:
+Create a schema file `greet.json`:
 
 ```json
 {
-  "name": "hello",
-  "description": "Say hello",
-  "options": [
+  "name": "greet",
+  "doc": ["A friendly greeting tool."],
+  "version": "1.0.0",
+  "args": [
     {
+      "kind": "flag",
+      "names": ["loud", "l"],
+      "doc": ["Print the greeting in uppercase."]
+    },
+    {
+      "kind": "positional",
       "name": "name",
+      "doc": ["The name to greet."],
       "type": "string",
-      "description": "Who to greet",
-      "default": "World"
+      "required": true
     }
   ]
 }
 ```
 
-Write the C++ code:
+Write the C++ code (`greet.cpp`):
 
 ```cpp
-#include <json_commander/json_commander.hpp>
+#include <json_commander/run.hpp>
+
 #include <iostream>
+#include <string>
 
-int main(int argc, char* argv[]) {
-  auto cli = json_commander::from_schema("hello.json");
-  auto args = cli.parse(argc, argv);
+int main(int argc, char *argv[]) {
+  return json_commander::run_file(GREET_SCHEMA, argc, argv,
+    [](const nlohmann::json &config) {
+      auto name = config["name"].get<std::string>();
+      auto loud = config["loud"].get<bool>();
 
-  std::cout << "Hello, " << args.get<std::string>("name") << "!\n";
+      std::string greeting = "Hello, " + name + "!";
+      if (loud) {
+        std::transform(greeting.begin(), greeting.end(),
+          greeting.begin(), ::toupper);
+      }
+      std::cout << greeting << "\n";
+      return 0;
+    });
 }
+```
+
+The `GREET_SCHEMA` macro is set via CMake to point at the JSON file:
+
+```cmake
+add_executable(greet greet.cpp)
+target_link_libraries(greet PRIVATE
+  json_commander::header
+  json_commander::library
+  nlohmann_json::nlohmann_json
+  nlohmann_json_schema_validator)
+target_compile_definitions(greet PRIVATE
+  GREET_SCHEMA="${CMAKE_CURRENT_SOURCE_DIR}/greet.json")
 ```
 
 Build and run:
 
 ```sh
-cmake -B build && cmake --build build
-./build/hello --name "JSON Commander"
+cmake --preset <preset-name>
+cmake --build build --config Release
+./build/examples/greet/Release/greet Alice
 ```
 
 ```
-Hello, JSON Commander!
+Hello, Alice!
+```
+
+```sh
+./build/examples/greet/Release/greet --loud Alice
+```
+
+```
+HELLO, ALICE!
+```
+
+```sh
+./build/examples/greet/Release/greet --help
+```
+
+```
+NAME
+       greet - A friendly greeting tool.
+
+SYNOPSIS
+       greet [OPTIONS] NAME
+
+ARGUMENTS
+       NAME
+           The name to greet.
+
+OPTIONS
+       --loud, -l
+           Print the greeting in uppercase.
 ```
 
 ## Next Steps
 
-Explore the [Documentation]({{< relref "/docs" >}}) for in-depth coverage of
-schema syntax, subcommands, type validation, and advanced features.
+Explore the [Documentation]({{< relref "/docs" >}}) for more on schema syntax,
+subcommands, type validation, and advanced features.
