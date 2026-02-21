@@ -5,7 +5,7 @@ toc = false
 
 {{< hextra/hero-subtitle >}}
   Define CLIs declaratively with JSON schemas.&nbsp;<br class="sm:block hidden" />
-  Type-safe argument parsing, nested subcommands, and automatic help generation for C++20.
+  Type-safe argument parsing, nested subcommands, and automatic help and man page generation for C++20.
 {{< /hextra/hero-subtitle >}}
 
 <div class="mt-6 mb-6 flex flex-wrap gap-4 justify-center">
@@ -23,19 +23,20 @@ toc = false
   ```json
   {
     "name": "greet",
-    "description": "A friendly greeting CLI",
-    "options": [
+    "doc": ["A friendly greeting tool."],
+    "version": "1.0.0",
+    "args": [
       {
-        "name": "name",
-        "type": "string",
-        "description": "Name to greet",
-        "required": true
+        "kind": "flag",
+        "names": ["loud", "l"],
+        "doc": ["Print the greeting in uppercase."]
       },
       {
-        "name": "count",
-        "type": "integer",
-        "description": "Number of times to greet",
-        "default": 1
+        "kind": "positional",
+        "name": "name",
+        "doc": ["The name to greet."],
+        "type": "string",
+        "required": true
       }
     ]
   }
@@ -44,39 +45,75 @@ toc = false
 
   {{< tab >}}
   ```cpp
-  #include <json_commander/json_commander.hpp>
+  #include <json_commander/run.hpp>
+
+  #include <algorithm>
+  #include <cctype>
   #include <iostream>
+  #include <string>
 
-  int main(int argc, char* argv[]) {
-    auto cli = json_commander::from_schema("greet.json");
-    auto args = cli.parse(argc, argv);
+  using namespace json_commander;
 
-    auto name = args.get<std::string>("name");
-    auto count = args.get<int>("count");
+  model::Root make_cli() {
+    model::Flag loud;
+    loud.names = {"loud", "l"};
+    loud.doc = {"Print the greeting in uppercase."};
 
-    for (int i = 0; i < count; ++i) {
-      std::cout << "Hello, " << name << "!\n";
-    }
+    model::Positional name;
+    name.name = "name";
+    name.doc = {"The name to greet."};
+    name.type = model::ScalarType::String;
+    name.required = true;
+
+    model::Root root;
+    root.name = "greet";
+    root.doc = {"A friendly greeting tool."};
+    root.version = "1.0.0";
+    root.args = std::vector<model::Argument>{loud, name};
+    return root;
+  }
+
+  int main(int argc, char *argv[]) {
+    return json_commander::run(make_cli(), argc, argv,
+      [](const nlohmann::json &config) {
+        std::string greeting =
+          "Hello, " + config["name"].get<std::string>() + "!";
+        if (config["loud"].get<bool>()) {
+          std::transform(greeting.begin(), greeting.end(),
+            greeting.begin(),
+            [](unsigned char c) {
+              return static_cast<char>(std::toupper(c));
+            });
+        }
+        std::cout << greeting << "\n";
+        return 0;
+      });
   }
   ```
   {{< /tab >}}
 
   {{< tab >}}
   ```sh
-  $ ./greet --name World --count 3
-  Hello, World!
-  Hello, World!
-  Hello, World!
+  $ ./greet Alice
+  Hello, Alice!
+
+  $ ./greet --loud Alice
+  HELLO, ALICE!
 
   $ ./greet --help
-  greet - A friendly greeting CLI
+  NAME
+         greet - A friendly greeting tool.
 
-  Usage: greet [OPTIONS]
+  SYNOPSIS
+         greet [OPTIONS] NAME
 
-  Options:
-    --name <string>     Name to greet (required)
-    --count <integer>   Number of times to greet (default: 1)
-    --help              Show this help message
+  ARGUMENTS
+         NAME
+             The name to greet.
+
+  OPTIONS
+         --loud, -l
+             Print the greeting in uppercase.
   ```
   {{< /tab >}}
 
@@ -92,7 +129,7 @@ toc = false
 
   {{< hextra/feature-card
     title="Type-Safe Parsing"
-    subtitle="Arguments are automatically validated and converted to their declared types at parse time."
+    subtitle="Scalar types (string, int, float, bool, enum, file, dir, path) and compound types (list, pair, triple) are validated and converted at parse time."
     icon="check-circle"
   >}}
 
@@ -103,20 +140,20 @@ toc = false
   >}}
 
   {{< hextra/feature-card
-    title="Automatic Help Generation"
-    subtitle="Help text and usage messages are generated directly from your schema — always accurate, always up to date."
+    title="Automatic Help and Man Pages"
+    subtitle="Help text and groff man pages are generated directly from your schema — always accurate, always up to date."
     icon="question-mark-circle"
   >}}
 
   {{< hextra/feature-card
     title="Modern C++20"
-    subtitle="Built with concepts, ranges, and structured bindings. Clean, modern API that feels native to C++20."
+    subtitle="Built with structured bindings, std::variant, and std::optional. Clean, modern API that feels native to C++20."
     icon="lightning-bolt"
   >}}
 
   {{< hextra/feature-card
-    title="Header-Only Option"
-    subtitle="Use as a header-only library for easy integration, or link as a static/shared library for faster builds."
+    title="Environment and Config Support"
+    subtitle="Options can fall back to environment variables when not provided on the command line. Generate JSON Schema for runtime configuration output."
     icon="puzzle"
   >}}
 
